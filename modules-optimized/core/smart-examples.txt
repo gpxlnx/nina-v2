@@ -1,0 +1,29 @@
+EXEMPLOS DE USO DAS FUNÇÕES INTELIGENTES:
+
+1. SMART_SAVE - Salva apenas se arquivo não estiver vazio:
+   # Ao invés de:
+   sort -u > results.txt
+   
+   # Use:
+   sort -u > results.tmp
+   smart_save results.tmp results.txt "subdomains"
+
+2. SMART_COMBINE - Combina arquivos e salva apenas se houver resultado:
+   # Ao invés de:
+   cat file1.txt file2.txt | sort -u > combined.txt
+   
+   # Use:
+   smart_combine file1.txt file2.txt combined.txt
+
+3. SMART_RUN - Executa comando e salva apenas se houver saída:
+   # Ao invés de:
+   curl -s "https://api.example.com" | jq -r '.data[]' > api-results.txt
+   
+   # Use:
+   smart_run 'curl -s "https://api.example.com" | jq -r ".data[]"' api-results.txt "API results"
+
+VANTAGENS:
+- ✅ Não cria arquivos vazios
+- ✅ Logs informativos sobre o que foi encontrado
+- ✅ Estrutura de diretórios mais limpa
+- ✅ Fácil identificação de onde há dados reais
