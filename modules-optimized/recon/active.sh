@@ -443,11 +443,13 @@ dns_resolution_validation() {
         "${base_dir}/recon/zone-transfer-results.txt"
     )
     
+    log_info "Combining active results from: ${active_sources[*]}"
     cat "${active_sources[@]}" 2>/dev/null | \
     sort -u > "${resolution_dir}/all-active-subdomains.txt"
     
     if [[ ! -s "${resolution_dir}/all-active-subdomains.txt" ]]; then
         log_info "No active subdomains to validate"
+        touch "${base_dir}/recon/subdomains-active.txt"
         return 0
     fi
     
@@ -456,11 +458,22 @@ dns_resolution_validation() {
     
     # Use dnsx for validation if available
     if tool_available dnsx; then
+        log_info "Using dnsx for DNS validation with threads: ${DNS_THREADS:-1000}, retries: ${DNS_RETRIES:-3}"
+        
         dnsx -l "${resolution_dir}/all-active-subdomains.txt" \
-        -t "$DNS_THREADS" -timeout "$DNS_TIMEOUT" \
-        -retry "$DNS_RETRIES" -nc -silent \
-        -o "${resolution_dir}/validated-subdomains.txt" 2>/dev/null || true
+        -t "${DNS_THREADS:-1000}" \
+        -retry "${DNS_RETRIES:-3}" -nc -silent \
+        -o "${resolution_dir}/validated-subdomains.txt" 2>/dev/null || {
+            log_warning "dnsx failed, using fallback validation"
+            # Fallback to basic dig validation
+            while IFS= read -r subdomain; do
+                if dig +short "$subdomain" 2>/dev/null | grep -E '^[0-9]+\.' >/dev/null; then
+                    echo "$subdomain" >> "${resolution_dir}/validated-subdomains.txt"
+                fi
+            done < "${resolution_dir}/all-active-subdomains.txt"
+        }
     else
+        log_info "dnsx not available, using dig fallback"
         # Fallback to basic dig validation
         while IFS= read -r subdomain; do
             if dig +short "$subdomain" 2>/dev/null | grep -E '^[0-9]+\.' >/dev/null; then
@@ -469,20 +482,32 @@ dns_resolution_validation() {
         done < "${resolution_dir}/all-active-subdomains.txt"
     fi
     
-    # Apply wildcard filtering
+    # Check if validation produced results
     if [[ -s "${resolution_dir}/validated-subdomains.txt" ]]; then
-        filter_wildcard_results < "${resolution_dir}/validated-subdomains.txt" > \
-        "${resolution_dir}/validated-filtered.txt"
+        local validated_subs=$(wc -l < "${resolution_dir}/validated-subdomains.txt")
+        log_info "DNS validation found $validated_subs live subdomains"
         
-        # Final active results
-        cp "${resolution_dir}/validated-filtered.txt" \
-           "${base_dir}/recon/subdomains-active.txt"
+        # Apply wildcard filtering
+        if [[ "$WILDCARD_DETECTED" == "true" ]]; then
+            log_info "Applying wildcard filtering"
+            filter_wildcard_results < "${resolution_dir}/validated-subdomains.txt" > \
+            "${resolution_dir}/validated-filtered.txt"
+            
+            # Final active results
+            cp "${resolution_dir}/validated-filtered.txt" \
+               "${base_dir}/recon/subdomains-active.txt"
+        else
+            # No wildcard filtering needed
+            cp "${resolution_dir}/validated-subdomains.txt" \
+               "${base_dir}/recon/subdomains-active.txt"
+        fi
     else
+        log_warning "No subdomains passed DNS validation"
         touch "${base_dir}/recon/subdomains-active.txt"
     fi
     
-    local validated_count=$(wc -l < "${base_dir}/recon/subdomains-active.txt" 2>/dev/null || echo "0")
-    log_message "DNS validation: $validated_count subdomains confirmed"
+    local final_count=$(wc -l < "${base_dir}/recon/subdomains-active.txt" 2>/dev/null || echo "0")
+    log_message "DNS resolution validation completed: $final_count live subdomains confirmed"
     
     commit_step "DNS Resolution Validation"
     return 0
