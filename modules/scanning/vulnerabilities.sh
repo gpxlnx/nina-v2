@@ -12,7 +12,7 @@ mkdir -p "${DIR_OUTPUT}/${DOMAIN}/log" 2>/dev/null
 mkdir -p "${DIR_OUTPUT}/${DOMAIN}/$(basename "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")" 2>/dev/null
 
 if [[ -z "${DIR_NINA:-}" ]]; then
-    echo "Error: Config not loaded. This module should be run via nina-recon-optimized.sh"
+    echo "Error: Config not loaded. This module should be run via nina-recon.sh"
     exit 1
 fi
 
@@ -264,7 +264,7 @@ ssl_tls_analysis() {
         
         tlsx -l "${ssl_dir}/https-targets.txt" \
         -json -silent \
-        -cn -san -org -expired -self-signed -mismatched \
+        -cn -san -so -expired -self-signed -mismatched \
         -o "${ssl_dir}/tlsx-analysis.json" 2>/dev/null || true
         
         # Extract certificate issues

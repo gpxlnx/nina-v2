@@ -9,7 +9,7 @@ VERSION="2.0.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source configuration and core modules
-source "${SCRIPT_DIR}/modules-optimized/core/config.sh" || {
+source "${SCRIPT_DIR}/modules/core/config.sh" || {
     echo "Error: Failed to load configuration. Please run setup first."
     exit 1
 }
@@ -37,18 +37,18 @@ export PERMUTATION_LIMIT=50000
 show_banner() {
     if [[ "${QUIET_MODE:-false}" != "true" ]]; then
         cat << 'EOF'
-╔══════════════════════════════════════════════════════════════════╗
-║                                                                  ║
-║    ███╗   ██╗██╗███╗   ██╗ █████╗     ██████╗ ███████╗ ██████╗  ║
-║    ████╗  ██║██║████╗  ██║██╔══██╗    ██╔══██╗██╔════╝██╔════╝  ║
-║    ██╔██╗ ██║██║██╔██╗ ██║███████║    ██████╔╝█████╗  ██║       ║
-║    ██║╚██╗██║██║██║╚██╗██║██╔══██║    ██╔══██╗██╔══╝  ██║       ║
-║    ██║ ╚████║██║██║ ╚████║██║  ██║    ██║  ██║███████╗╚██████╗  ║
-║    ╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝    ╚═╝  ╚═╝╚══════╝ ╚═════╝  ║
-║                                                                  ║
-║            OPTIMIZED - Advanced Bug Bounty Framework            ║
-║                                                                  ║
-╚══════════════════════════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════════════════╗
+║                                                                   ║
+║    ███╗   ██╗██╗███╗   ██╗ █████╗     ██████╗ ███████╗ ██████╗    ║
+║    ████╗  ██║██║████╗  ██║██╔══██╗    ██╔══██╗██╔════╝██╔════╝    ║
+║    ██╔██╗ ██║██║██╔██╗ ██║███████║    ██████╔╝█████╗  ██║         ║
+║    ██║╚██╗██║██║██║╚██╗██║██╔══██║    ██╔══██╗██╔══╝  ██║         ║
+║    ██║ ╚████║██║██║ ╚████║██║  ██║    ██║  ██║███████╗╚██████╗    ║
+║    ╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝    ╚═╝  ╚═╝╚══════╝ ╚═════╝    ║
+║                                                                   ║
+║            OPTIMIZED - Advanced Bug Bounty Framework              ║
+║                                                                   ║
+╚═══════════════════════════════════════════════════════════════════╝
 
 EOF
         echo -e "${CYAN}Version: ${VERSION}${NC}"
@@ -62,7 +62,7 @@ show_help() {
 NINA RECON OPTIMIZED - Advanced Bug Bounty Reconnaissance Framework
 
 USAGE:
-    nina-recon-optimized.sh [OPTIONS] [DOMAIN]
+    nina-recon.sh [OPTIONS] [DOMAIN]
 
 OPTIONS:
     -d, --domain DOMAIN         Target domain for reconnaissance
@@ -110,25 +110,25 @@ SCOPE TYPES:
 
 EXAMPLES:
     # Quick scan for closed scope
-    ./nina-recon-optimized.sh -d api.example.com -s closed -p quick
+    ./nina-recon.sh -d api.example.com -s closed -p quick
 
     # Standard wildcard reconnaissance
-    ./nina-recon-optimized.sh -d example.com -s wildcard -p standard
+    ./nina-recon.sh -d example.com -s wildcard -p standard
 
     # Deep scan with custom modules
-    ./nina-recon-optimized.sh -d example.com -m passive,active,httpx,crawler,fuzzing
+    ./nina-recon.sh -d example.com -m passive,active,httpx,crawler,fuzzing
 
     # Continuous monitoring for specific domain
-    ./nina-recon-optimized.sh -d example.com --continuous
+    ./nina-recon.sh -d example.com --continuous
 
     # Custom configuration and output
-    ./nina-recon-optimized.sh -d example.com -c custom.conf -o /tmp/recon
+    ./nina-recon.sh -d example.com -c custom.conf -o /tmp/recon
 
 CONFIGURATION:
     Configuration files are loaded from:
     1. Command line (-c option)
     2. ~/.nina/config.conf
-    3. ./modules-optimized/core/config.sh (default)
+    3. ./modules/core/config.sh (default)
 
 ENVIRONMENT VARIABLES:
     NINA_CONFIG_DIR     - Configuration directory (default: ~/.nina)
@@ -491,43 +491,43 @@ run_modules() {
 
 # Module execution functions
 run_setup_module() {
-    source "${SCRIPT_DIR}/modules-optimized/core/setup.sh"
+    source "${SCRIPT_DIR}/modules/core/setup.sh"
 }
 
 run_passive_module() {
-    source "${SCRIPT_DIR}/modules-optimized/recon/passive.sh"
+    source "${SCRIPT_DIR}/modules/recon/passive.sh"
 }
 
 run_active_module() {
-    source "${SCRIPT_DIR}/modules-optimized/recon/active.sh"
+    source "${SCRIPT_DIR}/modules/recon/active.sh"
 }
 
 run_httpx_module() {
-    source "${SCRIPT_DIR}/modules-optimized/probing/httpx.sh"
+    source "${SCRIPT_DIR}/modules/probing/httpx.sh"
 }
 
 run_crawler_module() {
-    source "${SCRIPT_DIR}/modules-optimized/discovery/crawler.sh"
+    source "${SCRIPT_DIR}/modules/discovery/crawler.sh"
 }
 
 run_fuzzing_module() {
-    source "${SCRIPT_DIR}/modules-optimized/discovery/fuzzing.sh"
+    source "${SCRIPT_DIR}/modules/discovery/fuzzing.sh"
 }
 
 run_js_module() {
-    source "${SCRIPT_DIR}/modules-optimized/analysis/javascript.sh"
+    source "${SCRIPT_DIR}/modules/analysis/javascript.sh"
 }
 
 run_sensitive_module() {
-    source "${SCRIPT_DIR}/modules-optimized/discovery/sensitive.sh"
+    source "${SCRIPT_DIR}/modules/discovery/sensitive.sh"
 }
 
 run_vulns_module() {
-    source "${SCRIPT_DIR}/modules-optimized/scanning/vulnerabilities.sh"
+    source "${SCRIPT_DIR}/modules/scanning/vulnerabilities.sh"
 }
 
 run_monitor_module() {
-    source "${SCRIPT_DIR}/modules-optimized/monitoring/continuous.sh"
+    source "${SCRIPT_DIR}/modules/monitoring/continuous.sh"
 }
 
 # =============================================================================
@@ -553,8 +553,8 @@ show_final_results() {
     log_message "Reconnaissance completed for $TARGET_DOMAIN"
     
     echo -e "\n${CYAN}╔══════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}║                         RESULTS SUMMARY                         ║${NC}"
-    echo -e "${CYAN}╚══════════════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${CYAN}  ║                         RESULTS SUMMARY                          ║${NC}"
+    echo -e "${CYAN}  ╚══════════════════════════════════════════════════════════════════╝${NC}"
     
     local results_dir="${DIR_OUTPUT}/${TARGET_DOMAIN}"
     
@@ -689,7 +689,7 @@ EOF
     cat > "$monitor_script" << 'EOF'
 #!/bin/bash
 source "$(dirname "$0")/monitor.conf"
-source "$(dirname "$0")/../../modules-optimized/core/config.sh"
+source "$(dirname "$0")/../../modules/core/config.sh"
 
 while true; do
     log_message "Running continuous monitoring check for $TARGET_DOMAIN"
@@ -699,10 +699,10 @@ while true; do
     for module in "${MODULES[@]}"; do
         case "$module" in
             passive)
-                source "$(dirname "$0")/../../modules-optimized/monitoring/passive-monitor.sh"
+                source "$(dirname "$0")/../../modules/monitoring/passive-monitor.sh"
                 ;;
             httpx)
-                source "$(dirname "$0")/../../modules-optimized/monitoring/httpx-monitor.sh"
+                source "$(dirname "$0")/../../modules/monitoring/httpx-monitor.sh"
                 ;;
         esac
     done

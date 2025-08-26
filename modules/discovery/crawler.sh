@@ -8,7 +8,7 @@
 
 # Ensure config is loaded
 if [[ -z "${DIR_NINA:-}" ]]; then
-    echo "Error: Config not loaded. This module should be run via nina-recon-optimized.sh"
+    echo "Error: Config not loaded. This module should be run via nina-recon.sh"
     exit 1
 fi
 

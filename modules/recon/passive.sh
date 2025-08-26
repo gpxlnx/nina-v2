@@ -12,7 +12,7 @@ mkdir -p "${DIR_OUTPUT}/${DOMAIN}/log" 2>/dev/null
 mkdir -p "${DIR_OUTPUT}/${DOMAIN}/$(basename "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")")" 2>/dev/null
 
 if [[ -z "${DIR_NINA:-}" ]]; then
-    echo "Error: Config not loaded. This module should be run via nina-recon-optimized.sh"
+    echo "Error: Config not loaded. This module should be run via nina-recon.sh"
     exit 1
 fi
 
@@ -86,7 +86,7 @@ certificate_transparency() {
     # TLSX enumeration if available
     if tool_available tlsx; then
         log_info "Running TLSX enumeration"
-        echo "$DOMAIN" | tlsx -json -silent -cn -san -expired 2>/dev/null | \
+        echo "$DOMAIN" | tlsx -json -silent -cn -san 2>/dev/null | \
         jq -r '.subject_an[]?, .subject_cn?' 2>/dev/null | \
         grep -v '^null$' | grep -v '^$' | \
         sort -u > "${cert_dir}/tlsx-results.txt" || true
