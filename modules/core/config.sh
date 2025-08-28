@@ -89,6 +89,11 @@ export FUZZING_WORDLIST_LIMIT="${FUZZING_WORDLIST_LIMIT:-50000}"
 export JS_ANALYSIS_TIMEOUT="${JS_ANALYSIS_TIMEOUT:-30}"
 export JS_DOWNLOAD_LIMIT="${JS_DOWNLOAD_LIMIT:-100}"
 
+# Notification settings (using ProjectDiscovery's notify)
+export NOTIFY_ENABLED="${NOTIFY_ENABLED:-true}"
+export NOTIFY_PROVIDER_ID="${NOTIFY_PROVIDER_ID:-nina-result}"
+export NOTIFY_CONFIG="${NOTIFY_CONFIG:-$HOME/.config/notify/provider-config.yaml}"
+
 # =============================================================================
 # OPTIMIZATION PROFILES
 # =============================================================================
@@ -194,6 +199,102 @@ configure_for_open_scope() {
     export SUBDOMAIN_BRUTEFORCE_LIMIT=100000
     export FOCUS_BALANCED=true
     export ENABLE_MULTI_DOMAIN_ANALYSIS=true
+}
+
+# =============================================================================
+# NOTIFICATION FUNCTIONS
+# =============================================================================
+
+# Check if notify tool is available and configured
+check_notify_setup() {
+    if [[ "$NOTIFY_ENABLED" != "true" ]]; then
+        return 1
+    fi
+    
+    if ! command -v notify >/dev/null 2>&1; then
+        log_warning "notify tool not found. Install with: go install -v github.com/projectdiscovery/notify/cmd/notify@latest"
+        return 1
+    fi
+    
+    if [[ ! -f "$NOTIFY_CONFIG" ]]; then
+        log_warning "notify config not found at: $NOTIFY_CONFIG"
+        log_info "Create config with your Telegram settings"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Send notification using notify
+send_notification() {
+    local message="$1"
+    local priority="${2:-info}"  # info, success, warning, error
+    
+    if ! check_notify_setup; then
+        return 0
+    fi
+    
+    # Add emoji based on priority
+    local emoji=""
+    case "$priority" in
+        "success") emoji="✅" ;;
+        "warning") emoji="⚠️" ;;
+        "error") emoji="❌" ;;
+        "info") emoji="ℹ️" ;;
+        "start") emoji="🚀" ;;
+        "progress") emoji="⏳" ;;
+        "complete") emoji="🎯" ;;
+        *) emoji="📢" ;;
+    esac
+    
+    # Format message for Telegram
+    local formatted_message="${emoji} **NINA Recon**\n\n${message}"
+    
+    # Send notification
+    echo -e "$formatted_message" | notify -provider-config "$NOTIFY_CONFIG" -id "$NOTIFY_PROVIDER_ID" 2>/dev/null || {
+        log_warning "Failed to send notification"
+    }
+}
+
+# Notification shortcuts for different types
+notify_start() {
+    local domain="$1"
+    local profile="$2"
+    send_notification "🚀 **Scan Started**\n\nTarget: \`${domain}\`\nProfile: \`${profile}\`\nTime: \`$(date '+%Y-%m-%d %H:%M:%S')\`" "start"
+}
+
+notify_progress() {
+    local domain="$1"
+    local module="$2"
+    local status="$3"
+    send_notification "⏳ **Progress Update**\n\nTarget: \`${domain}\`\nModule: \`${module}\`\nStatus: ${status}" "progress"
+}
+
+notify_module_complete() {
+    local domain="$1"
+    local module="$2"
+    local results="$3"
+    send_notification "✅ **Module Complete**\n\nTarget: \`${domain}\`\nModule: \`${module}\`\nResults: ${results}" "success"
+}
+
+notify_vulnerability_found() {
+    local domain="$1"
+    local vuln_type="$2"
+    local count="$3"
+    send_notification "🚨 **Vulnerabilities Found**\n\nTarget: \`${domain}\`\nType: \`${vuln_type}\`\nCount: \`${count}\`" "warning"
+}
+
+notify_scan_complete() {
+    local domain="$1"
+    local stats="$2"
+    local duration="$3"
+    send_notification "🎯 **Scan Complete**\n\nTarget: \`${domain}\`\nDuration: \`${duration}\`\n\n${stats}" "complete"
+}
+
+notify_error() {
+    local domain="$1"
+    local error_msg="$2"
+    send_notification "❌ **Error Occurred**\n\nTarget: \`${domain}\`\nError: ${error_msg}" "error"
 }
 
 # =============================================================================

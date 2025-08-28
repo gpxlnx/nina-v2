@@ -76,7 +76,8 @@ OPTIONS:
     -q, --quiet                 Suppress banner and minimize output
     --wildcard-check            Enable wildcard detection and mitigation
     --continuous                Enable continuous monitoring mode
-    --notification              Enable Slack/Discord notifications
+    --notifications             Enable Telegram notifications via notify
+    --no-notifications          Disable all notifications
     -h, --help                  Show this help message
     -v, --version               Show version information
 
@@ -226,8 +227,12 @@ parse_arguments() {
                 continuous=true
                 shift
                 ;;
-            --notification)
-                notification=true
+            --notifications)
+                export NOTIFY_ENABLED=true
+                shift
+                ;;
+            --no-notifications)
+                export NOTIFY_ENABLED=false
                 shift
                 ;;
             -h|--help)
@@ -496,44 +501,54 @@ run_setup_module() {
 
 run_passive_module() {
     source "${SCRIPT_DIR}/modules/recon/passive.sh"
+    main_passive
 }
 
 run_active_module() {
     source "${SCRIPT_DIR}/modules/recon/active.sh"
+    main_active
 }
 
 run_httpx_module() {
     source "${SCRIPT_DIR}/modules/probing/httpx.sh"
+    main_httpx
 }
 
 run_crawler_module() {
     source "${SCRIPT_DIR}/modules/discovery/crawler.sh"
+    main_crawler
 }
 
 run_fuzzing_module() {
     source "${SCRIPT_DIR}/modules/discovery/fuzzing.sh"
+    main_fuzzing
 }
 
 run_js_module() {
     source "${SCRIPT_DIR}/modules/analysis/javascript.sh"
+    main_javascript
 }
 
 run_sensitive_module() {
     source "${SCRIPT_DIR}/modules/discovery/sensitive.sh"
+    main_sensitive
 }
 
 run_vulns_module() {
     source "${SCRIPT_DIR}/modules/scanning/vulnerabilities.sh"
+    main_vulns
 }
 
 run_monitor_module() {
     source "${SCRIPT_DIR}/modules/monitoring/continuous.sh"
+    main_monitor
 }
 
 # =============================================================================
 # RESULTS AND REPORTING
 # =============================================================================
 
+ensure_live_hosts_file() {
     # Ensure live-hosts.txt exists for other modules
     if [[ ! -f "${DIR_OUTPUT}/${DOMAIN}/live-hosts.txt" ]]; then
         if [[ -f "${DIR_OUTPUT}/${DOMAIN}/recon/subdomains-all.txt" ]]; then
@@ -548,6 +563,7 @@ run_monitor_module() {
             echo "http://${DOMAIN}" >> "${DIR_OUTPUT}/${DOMAIN}/live-hosts.txt"
         fi
     fi
+}
 
 show_final_results() {
     log_message "Reconnaissance completed for $TARGET_DOMAIN"
@@ -573,10 +589,10 @@ show_final_results() {
         local active_subs=0
         local live_hosts=0
         
-        [[ -f "$results_dir/recon-subdomains-passive.txt" ]] && \
-            passive_subs=$(wc -l < "$results_dir/recon-subdomains-passive.txt")
-        [[ -f "$results_dir/recon-subdomains-active.txt" ]] && \
-            active_subs=$(wc -l < "$results_dir/recon-subdomains-active.txt")
+        [[ -f "$results_dir/recon/subdomains-passive.txt" ]] && \
+            passive_subs=$(wc -l < "$results_dir/recon/subdomains-passive.txt")
+        [[ -f "$results_dir/recon/subdomains-active.txt" ]] && \
+            active_subs=$(wc -l < "$results_dir/recon/subdomains-active.txt")
         [[ -f "$results_dir/live-hosts.txt" ]] && \
             live_hosts=$(wc -l < "$results_dir/live-hosts.txt")
         
@@ -591,10 +607,10 @@ show_final_results() {
         
         [[ -f "$results_dir/all-urls.txt" ]] && \
             urls=$(wc -l < "$results_dir/all-urls.txt")
-        [[ -f "$results_dir/sensitive-files.txt" ]] && \
-            sensitive_files=$(wc -l < "$results_dir/sensitive-files.txt")
-        [[ -f "$results_dir/js-files.txt" ]] && \
-            js_files=$(wc -l < "$results_dir/js-files.txt")
+        [[ -f "$results_dir/discovery/sensitive/all-sensitive.txt" ]] && \
+            sensitive_files=$(wc -l < "$results_dir/discovery/sensitive/all-sensitive.txt")
+        [[ -f "$results_dir/analysis/javascript/all-js-files.txt" ]] && \
+            js_files=$(wc -l < "$results_dir/analysis/javascript/all-js-files.txt")
         
         echo "  🌐 Total URLs: $urls"
         echo "  🔐 Sensitive Files: $sensitive_files"
@@ -622,8 +638,8 @@ show_final_results() {
         echo -e "\n${YELLOW}Key Output Files:${NC}"
         echo "  📁 All results: $results_dir/"
         echo "  📋 Summary log: $results_dir/log/log.txt"
-        [[ -f "$results_dir/recon-subdomains-all.txt" ]] && \
-            echo "  🎯 All subdomains: $results_dir/recon-subdomains-all.txt"
+        [[ -f "$results_dir/recon/subdomains-all.txt" ]] && \
+            echo "  🎯 All subdomains: $results_dir/recon/subdomains-all.txt"
         [[ -f "$results_dir/live-hosts.txt" ]] && \
             echo "  🟢 Live hosts: $results_dir/live-hosts.txt"
         [[ -f "$results_dir/vulnerabilities.txt" ]] && \
@@ -633,33 +649,64 @@ show_final_results() {
         log_warning "Results directory not found: $results_dir"
     fi
     
-    # Send notification if enabled
-    if [[ "$NOTIFICATION_ENABLED" == "true" ]]; then
-        send_completion_notification
-    fi
+    # Send completion notification
+    send_completion_notification
     
     echo ""
 }
 
 send_completion_notification() {
-    local message="🎯 NINA Recon completed for $TARGET_DOMAIN"
-    local details=""
-    
-    # Add basic stats to notification
     local results_dir="${DIR_OUTPUT}/${TARGET_DOMAIN}"
+    
     if [[ -d "$results_dir" ]]; then
+        # Calculate execution time
+        local duration="Unknown"
+        local start_time_file="$results_dir/log/start_time.txt"
+        if [[ -f "$start_time_file" ]]; then
+            local start_time=$(cat "$start_time_file")
+            local end_time=$(date +%s)
+            local duration_sec=$((end_time - start_time))
+            local hours=$((duration_sec / 3600))
+            local minutes=$(((duration_sec % 3600) / 60))
+            duration="${hours}h ${minutes}m"
+        fi
+        
+        # Collect statistics
+        local passive_subs=0
+        local active_subs=0
         local live_hosts=0
+        local urls=0
         local vulnerabilities=0
         
+        [[ -f "$results_dir/recon/subdomains-passive.txt" ]] && \
+            passive_subs=$(wc -l < "$results_dir/recon/subdomains-passive.txt")
+        [[ -f "$results_dir/recon/subdomains-active.txt" ]] && \
+            active_subs=$(wc -l < "$results_dir/recon/subdomains-active.txt")
         [[ -f "$results_dir/live-hosts.txt" ]] && \
             live_hosts=$(wc -l < "$results_dir/live-hosts.txt")
+        [[ -f "$results_dir/all-urls.txt" ]] && \
+            urls=$(wc -l < "$results_dir/all-urls.txt")
         [[ -f "$results_dir/vulnerabilities.txt" ]] && \
             vulnerabilities=$(wc -l < "$results_dir/vulnerabilities.txt")
         
-        details=" | Live hosts: $live_hosts | Vulns: $vulnerabilities"
+        # Format stats message
+        local stats="**📊 Results:**\n"
+        stats+="• Passive Subdomains: \`${passive_subs}\`\n"
+        stats+="• Active Subdomains: \`${active_subs}\`\n"
+        stats+="• Live Hosts: \`${live_hosts}\`\n"
+        stats+="• Total URLs: \`${urls}\`\n"
+        stats+="• Vulnerabilities: \`${vulnerabilities}\`"
+        
+        # Send completion notification
+        notify_scan_complete "$TARGET_DOMAIN" "$stats" "$duration"
+        
+        # Send vulnerability alert if found
+        if [[ $vulnerabilities -gt 0 ]]; then
+            notify_vulnerability_found "$TARGET_DOMAIN" "Multiple Types" "$vulnerabilities"
+        fi
+    else
+        notify_error "$TARGET_DOMAIN" "Results directory not found"
     fi
-    
-    notify_slack "$message$details"
 }
 
 # =============================================================================
@@ -758,12 +805,16 @@ main() {
     log_message "Output: ${DIR_OUTPUT}/${TARGET_DOMAIN}"
     
     # Send start notification
-    if [[ "$NOTIFICATION_ENABLED" == "true" ]]; then
-        notify_slack "🚀 Starting NINA Recon for $TARGET_DOMAIN (scope: $SCOPE_TYPE)"
-    fi
+    notify_start "$TARGET_DOMAIN" "${SCAN_PROFILE:-custom}"
+    
+    # Ensure live hosts file exists before other modules
+    ensure_live_hosts_file
     
     # Execute profile or custom modules
     execute_profile
+    
+    # Show final results
+    show_final_results
     
     # Setup continuous monitoring if requested
     setup_continuous_monitoring

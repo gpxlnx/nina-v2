@@ -52,10 +52,15 @@ collect_javascript_files() {
     
     # Sources to search for JS files
     local search_sources=(
-        "${base_dir}/all-discovered-urls.txt"
-        "${base_dir}/all-fuzzing-results.txt" 
-        "${base_dir}/discovery/content/all-files.txt"
-        "${base_dir}/probing/live-urls-final.txt"
+        "${base_dir}/all-urls.txt"
+        "${base_dir}/live-hosts.txt"
+        "${base_dir}/discovery/gau/gau-urls.txt"
+        "${base_dir}/discovery/wayback/wayback-urls.txt"
+        "${base_dir}/discovery/all-archive-urls.txt"
+        "${base_dir}/discovery/crawl/katana-urls.txt"
+        "${base_dir}/discovery/content/ffuf-results.txt"
+        "${base_dir}/discovery/content/gobuster-results.txt"
+        "${base_dir}/probing/httpx-results.txt"
     )
     
     log_info "Searching for JavaScript files in discovered URLs"

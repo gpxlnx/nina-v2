@@ -42,6 +42,13 @@ initialize_vulnerability_scanning() {
         mkdir -p "${vuln_dir}/${subdir}" 2>/dev/null
     done
     
+    # Create all-urls.txt by combining various URL sources
+    log_info "Creating consolidated URL list"
+    create_consolidated_urls "$base_dir"
+    
+    # Check available vulnerability scanning tools
+    check_vulnerability_tools
+    
     # Check if we have URLs to scan
     if [[ ! -f "${base_dir}/live-hosts.txt" ]] || [[ ! -s "${base_dir}/live-hosts.txt" ]]; then
         log_warning "No live hosts found for vulnerability scanning"
@@ -65,6 +72,11 @@ nuclei_vulnerability_scanning() {
     
     # Prepare target list
     local targets="${nuclei_dir}/scan-targets.txt"
+    
+    # Ensure all-urls.txt exists
+    if [[ ! -f "${base_dir}/all-urls.txt" ]]; then
+        create_consolidated_urls "$base_dir"
+    fi
     
     # Combine various URL sources for comprehensive scanning
     cat "${base_dir}/live-hosts.txt" \
@@ -274,6 +286,16 @@ ssl_tls_analysis() {
         fi
     fi
     
+    # Ensure certificate-issues.txt exists
+    if [[ ! -f "${ssl_dir}/certificate-issues.txt" ]]; then
+        : > "${ssl_dir}/certificate-issues.txt"
+    fi
+    
+    # Ensure weak-ssl-hosts.txt exists  
+    if [[ ! -f "${ssl_dir}/weak-ssl-hosts.txt" ]]; then
+        : > "${ssl_dir}/weak-ssl-hosts.txt"
+    fi
+    
     # Check for common SSL/TLS vulnerabilities with Nuclei
     if tool_available nuclei; then
         log_info "Running Nuclei SSL/TLS vulnerability checks"
@@ -284,6 +306,10 @@ ssl_tls_analysis() {
         -rate-limit 50 \
         -silent -o "${ssl_dir}/nuclei-ssl-vulns.txt" 2>/dev/null || true
     fi
+    
+    # Ensure files exist before counting
+    [[ ! -f "${ssl_dir}/certificate-issues.txt" ]] && : > "${ssl_dir}/certificate-issues.txt"
+    [[ ! -f "${ssl_dir}/weak-ssl-hosts.txt" ]] && : > "${ssl_dir}/weak-ssl-hosts.txt"
     
     local ssl_issues=$(wc -l < "${ssl_dir}/certificate-issues.txt" 2>/dev/null || echo "0")
     local weak_ssl=$(wc -l < "${ssl_dir}/weak-ssl-hosts.txt" 2>/dev/null || echo "0")
@@ -304,6 +330,11 @@ web_vulnerability_scanning() {
     # Prepare URLs for web vulnerability scanning
     local web_targets="${web_dir}/web-scan-targets.txt"
     
+    # Ensure all-urls.txt exists
+    if [[ ! -f "${base_dir}/all-urls.txt" ]]; then
+        create_consolidated_urls "$base_dir"
+    fi
+    
     # Include various URL types
     cat "${base_dir}/live-hosts.txt" \
         "${base_dir}/all-urls.txt" 2>/dev/null | \
@@ -319,10 +350,18 @@ web_vulnerability_scanning() {
     log_info "Scanning for XSS vulnerabilities"
     
     if tool_available dalfox; then
+        log_info "Running dalfox on $(wc -l < "$web_targets") targets"
         dalfox file "$web_targets" \
         --silence \
         --format json \
         --output "${web_dir}/dalfox-xss.json" 2>/dev/null || true
+        
+        if [[ -f "${web_dir}/dalfox-xss.json" ]]; then
+            local xss_count=$(jq length "${web_dir}/dalfox-xss.json" 2>/dev/null || echo "0")
+            log_info "Dalfox completed: $xss_count potential XSS found"
+        fi
+    else
+        log_warning "dalfox not available, skipping XSS detection"
     fi
     
     # SQL Injection Detection
@@ -341,8 +380,16 @@ web_vulnerability_scanning() {
     log_info "Scanning for CRLF injection"
     
     if tool_available crlfuzz; then
+        log_info "Running crlfuzz on $(wc -l < "$web_targets") targets"
         crlfuzz -l "$web_targets" \
         -o "${web_dir}/crlf-vulnerabilities.txt" 2>/dev/null || true
+        
+        if [[ -f "${web_dir}/crlf-vulnerabilities.txt" ]]; then
+            local crlf_count=$(wc -l < "${web_dir}/crlf-vulnerabilities.txt")
+            log_info "Crlfuzz completed: $crlf_count CRLF issues found"
+        fi
+    else
+        log_warning "crlfuzz not available, skipping CRLF injection testing"
     fi
     
     # Open Redirect Detection
@@ -415,6 +462,11 @@ api_security_testing() {
     
     # Find API endpoints
     local api_targets="${api_dir}/api-targets.txt"
+    
+    # Ensure all-urls.txt exists
+    if [[ ! -f "${base_dir}/all-urls.txt" ]]; then
+        create_consolidated_urls "$base_dir"
+    fi
     
     grep -E "(api|rest|graphql|v[0-9]+)" "${base_dir}/all-urls.txt" 2>/dev/null | \
     head -100 > "$api_targets" || true
@@ -514,6 +566,11 @@ secrets_detection() {
     local pages_dir="${secrets_dir}/pages"
     mkdir -p "$pages_dir" 2>/dev/null
     
+    # Ensure all-urls.txt exists
+    if [[ ! -f "${base_dir}/all-urls.txt" ]]; then
+        create_consolidated_urls "$base_dir"
+    fi
+    
     head -50 "${base_dir}/all-urls.txt" | while IFS= read -r url; do
         local safe_filename=$(echo "$url" | sed 's|[^a-zA-Z0-9.-]|_|g')
         curl -s -L --max-time 30 "$url" > "${pages_dir}/${safe_filename}.html" 2>/dev/null || true
@@ -543,6 +600,9 @@ secrets_detection() {
     
     # Look for exposed .env files and config files
     log_info "Checking for exposed configuration files"
+    
+    # Ensure exposed-configs.txt exists
+    : > "${secrets_dir}/exposed-configs.txt"
     
     local config_paths=(
         "/.env"
@@ -584,6 +644,20 @@ secrets_detection() {
     
     # Clean up downloaded pages to save space
     rm -rf "$pages_dir" 2>/dev/null
+    
+    # Ensure all secrets files exist
+    local secrets_files=(
+        "potential-secrets.txt"
+        "exposed-configs.txt"
+        "sensitive-configs.txt"
+        "trufflehog-secrets.txt"
+    )
+    
+    for secrets_file in "${secrets_files[@]}"; do
+        if [[ ! -f "${secrets_dir}/${secrets_file}" ]]; then
+            : > "${secrets_dir}/${secrets_file}"
+        fi
+    done
     
     local secrets_count=$(wc -l < "${secrets_dir}/potential-secrets.txt" 2>/dev/null || echo "0")
     local configs_count=$(wc -l < "${secrets_dir}/exposed-configs.txt" 2>/dev/null || echo "0")
@@ -706,6 +780,109 @@ EOF
 # HELPER FUNCTIONS
 # =============================================================================
 
+check_vulnerability_tools() {
+    log_info "Checking vulnerability scanning tools availability"
+    
+    local tools=(
+        "nuclei:Critical - Main vulnerability scanner"
+        "dalfox:XSS detection"
+        "sqlmap:SQL injection testing"
+        "crlfuzz:CRLF injection testing"
+        "subzy:Subdomain takeover detection"
+        "subjack:Subdomain takeover detection"
+        "sslscan:SSL/TLS analysis"
+        "testssl.sh:Comprehensive SSL testing"
+        "tlsx:TLS certificate analysis"
+        "trufflehog:Secrets detection"
+    )
+    
+    local missing_tools=()
+    local available_tools=()
+    
+    for tool_info in "${tools[@]}"; do
+        local tool_name=$(echo "$tool_info" | cut -d':' -f1)
+        local tool_desc=$(echo "$tool_info" | cut -d':' -f2)
+        
+        if tool_available "$tool_name"; then
+            available_tools+=("$tool_name")
+            log_info "✅ $tool_name - $tool_desc"
+        else
+            missing_tools+=("$tool_name")
+            log_warning "❌ $tool_name - $tool_desc"
+        fi
+    done
+    
+    log_info "Available tools: ${#available_tools[@]}/$(( ${#tools[@]} ))"
+    
+    if [[ ${#missing_tools[@]} -gt 0 ]]; then
+        log_warning "Missing tools: ${missing_tools[*]}"
+        log_warning "Some vulnerability checks will be skipped"
+    fi
+    
+    # Check critical tool
+    if ! tool_available nuclei; then
+        log_error "Nuclei is not available - this is required for vulnerability scanning"
+        log_error "Install with: go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest"
+        return 1
+    fi
+    
+    return 0
+}
+
+create_consolidated_urls() {
+    local base_dir="$1"
+    
+    # Create all-urls.txt by combining various URL sources
+    local url_sources=(
+        "${base_dir}/live-hosts.txt"
+        "${base_dir}/discovery/gau/gau-urls.txt"
+        "${base_dir}/discovery/wayback/wayback-urls.txt"
+        "${base_dir}/discovery/all-archive-urls.txt"
+        "${base_dir}/discovery/crawl/katana-urls.txt"
+        "${base_dir}/discovery/archive-urls.txt"
+        "${base_dir}/recon/passive/archives/gau-urls.txt"
+        "${base_dir}/recon/passive/archives/wayback-urls.txt"
+        "${base_dir}/recon/passive/archives/waybackurls-urls.txt"
+    )
+    
+    # Ensure the file exists
+    : > "${base_dir}/all-urls.txt"
+    
+    # Combine all URL sources
+    for source in "${url_sources[@]}"; do
+        if [[ -f "$source" && -s "$source" ]]; then
+            cat "$source" >> "${base_dir}/all-urls.txt"
+        fi
+    done
+    
+    # If we have subdomains but no URLs, create basic URLs
+    if [[ ! -s "${base_dir}/all-urls.txt" && -f "${base_dir}/recon/subdomains-all.txt" && -s "${base_dir}/recon/subdomains-all.txt" ]]; then
+        log_info "Creating URLs from discovered subdomains"
+        while IFS= read -r subdomain; do
+            echo "https://${subdomain}"
+            echo "http://${subdomain}"
+        done < "${base_dir}/recon/subdomains-all.txt" >> "${base_dir}/all-urls.txt"
+    fi
+    
+    # If still empty, use the target domain
+    if [[ ! -s "${base_dir}/all-urls.txt" ]]; then
+        log_info "No URLs found, creating from target domain"
+        echo "https://${DOMAIN}" > "${base_dir}/all-urls.txt"
+        echo "http://${DOMAIN}" >> "${base_dir}/all-urls.txt"
+    fi
+    
+    # Clean up and deduplicate
+    if [[ -s "${base_dir}/all-urls.txt" ]]; then
+        sort -u "${base_dir}/all-urls.txt" > "${base_dir}/all-urls.txt.tmp"
+        mv "${base_dir}/all-urls.txt.tmp" "${base_dir}/all-urls.txt"
+        
+        local url_count=$(wc -l < "${base_dir}/all-urls.txt")
+        log_info "Created consolidated URL list with $url_count unique URLs"
+    else
+        log_warning "Failed to create consolidated URL list"
+    fi
+}
+
 process_nuclei_results() {
     local nuclei_dir="$1"
     
@@ -735,7 +912,7 @@ process_nuclei_results() {
 main_vulns() {
     show_module_info "VULNERABILITY SCANNING" "Advanced vulnerability detection and security analysis"
     
-    notify_slack "🔍 [${DOMAIN}] Starting vulnerability scanning"
+    notify_progress "$DOMAIN" "Vulnerability Scan" "Starting comprehensive security analysis"
     
     # Initialize
     initialize_vulnerability_scanning || {
@@ -810,7 +987,12 @@ main_vulns() {
     local critical_count=$(grep -c "\[critical\]" "${base_dir}/vulnerabilities.txt" 2>/dev/null || echo "0")
     local high_count=$(grep -c "\[high\]" "${base_dir}/vulnerabilities.txt" 2>/dev/null || echo "0")
     
-    notify_slack "🔍 [${DOMAIN}] Vulnerability scanning completed - Found $total_vulns total findings ($critical_count critical, $high_count high)"
+    notify_module_complete "$DOMAIN" "Vulnerability Scan" "$total_vulns findings ($critical_count critical, $high_count high)"
+    
+    # Send special alert for critical vulnerabilities
+    if [[ $critical_count -gt 0 ]]; then
+        notify_vulnerability_found "$DOMAIN" "Critical" "$critical_count"
+    fi
     
     commit_step "Vulnerability Scanning"
     return 0

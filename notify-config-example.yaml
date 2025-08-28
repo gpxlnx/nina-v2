@@ -1,0 +1,27 @@
+# NINA-v2 Notify Configuration Example
+# Save this as ~/.config/notify/provider-config.yaml
+
+providers:
+  - id: "nina-result"
+    telegram_api_key: "8142001762:AAFH42XVvVkDeKhE-1KBj4JKHV9vehdDcCs"
+    telegram_chat_id: "176232878"
+    telegram_format: "{{data}}"
+    telegram_parsemode: "Markdown"
+
+# Additional examples for other providers:
+#  - id: "nina-alerts"
+#    discord_webhook_url: "YOUR_DISCORD_WEBHOOK_URL"
+#    discord_username: "NINA Bot"
+#    discord_avatar: "https://example.com/avatar.png"
+#
+#  - id: "nina-slack"
+#    slack_webhook_url: "YOUR_SLACK_WEBHOOK_URL"
+#    slack_username: "NINA Recon"
+#    slack_channel: "#security"
+
+# Usage:
+# 1. Copy this file to ~/.config/notify/provider-config.yaml
+# 2. Update with your actual Telegram bot token and chat ID
+# 3. Make sure notify tool is installed:
+#    go install -v github.com/projectdiscovery/notify/cmd/notify@latest
+# 4. Test with: echo "Test message" | notify -id nina-result

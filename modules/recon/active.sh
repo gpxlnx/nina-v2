@@ -792,7 +792,7 @@ generate_custom_mutations() {
 main_active() {
     show_module_info "ACTIVE RECONNAISSANCE" "Advanced DNS bruteforce and active subdomain discovery"
     
-    notify_slack "🔨 [${DOMAIN}] Starting active reconnaissance"
+    notify_progress "$DOMAIN" "Active Recon" "Starting active reconnaissance with DNS bruteforce"
     
     # Initialize
     initialize_active_recon || {
@@ -855,7 +855,7 @@ main_active() {
     fi
     
     # Final notification
-    notify_slack "✅ [${DOMAIN}] Active reconnaissance completed - Found $active_found new subdomains (Total: $total_found)"
+    notify_module_complete "$DOMAIN" "Active Recon" "$active_found new subdomains found (Total: $total_found)"
     
     commit_step "Active Reconnaissance"
     return 0

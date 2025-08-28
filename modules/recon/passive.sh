@@ -238,6 +238,7 @@ web_archives_enumeration() {
     sort -u > "${base_dir}/recon/archives-subdomains.txt"
     
     # Combine URLs for later use
+    mkdir -p "${base_dir}/discovery" 2>/dev/null
     cat "${archive_dir}"/*-urls.txt 2>/dev/null | \
     sort -u > "${base_dir}/discovery/archive-urls.txt"
     
@@ -564,7 +565,7 @@ EOF
 main_passive() {
     show_module_info "PASSIVE RECONNAISSANCE" "Advanced OSINT-based subdomain enumeration and data gathering"
     
-    notify_slack "🔍 [${DOMAIN}] Starting passive reconnaissance"
+    notify_progress "$DOMAIN" "Passive Recon" "Starting passive reconnaissance"
     
     # Initialize
     initialize_passive_recon || {
@@ -629,7 +630,7 @@ main_passive() {
     fi
     
     # Final notification
-    notify_slack "✅ [${DOMAIN}] Passive reconnaissance completed - Found $total_found subdomains"
+    notify_module_complete "$DOMAIN" "Passive Recon" "$total_found subdomains discovered"
     
     commit_step "Passive Reconnaissance"
     return 0

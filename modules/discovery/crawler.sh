@@ -99,6 +99,8 @@ archive_url_extraction() {
         echo "$DOMAIN" | gau --threads 5 --timeout 30 2>/dev/null | \
         head -10000 > "${archive_dir}/gau-urls.tmp"
         
+        # Ensure GAU directory exists
+        mkdir -p "${base_dir}/discovery/gau" 2>/dev/null
         smart_save "${archive_dir}/gau-urls.tmp" "${base_dir}/discovery/gau/gau-urls.txt" "GAU URLs"
         
         # Extract subdomains from GAU URLs
@@ -435,6 +437,7 @@ EOF
 # =============================================================================
 
 main_crawler() {
+    notify_progress "$DOMAIN" "Web Crawler" "Starting URL discovery and content crawling"
     log_message "Starting web crawling module"
     
     # Initialize crawler environment
@@ -450,6 +453,15 @@ main_crawler() {
     api_endpoint_discovery
     consolidate_crawler_results
     
+    # Count discovered URLs
+    local base_dir="${DIR_OUTPUT}/${DOMAIN}"
+    local total_urls=0
+    
+    if [[ -f "${base_dir}/discovery/all-crawler-results.txt" ]]; then
+        total_urls=$(wc -l < "${base_dir}/discovery/all-crawler-results.txt" 2>/dev/null || echo "0")
+    fi
+    
+    notify_module_complete "$DOMAIN" "Web Crawler" "$total_urls URLs discovered"
     log_message "Web crawling completed"
     return 0
 }
