@@ -504,15 +504,11 @@ consolidate_passive_results() {
         "${base_dir}/recon/chaos.txt"
     )
     
-    # Combine and deduplicate
+    # Combine and deduplicate directly to final file
     cat "${passive_files[@]}" 2>/dev/null | \
     grep -v '^$' | \
     grep -E "\.${DOMAIN}$|^${DOMAIN}$" | \
-    sort -u > "${base_dir}/recon/subdomains-passive-all.txt"
-    
-    # Create final passive results file
-    cp "${base_dir}/recon/subdomains-passive-all.txt" \
-       "${base_dir}/recon/subdomains-passive.txt"
+    sort -u > "${base_dir}/recon/subdomains-passive.txt"
     
     # Generate statistics
     local total_passive=$(wc -l < "${base_dir}/recon/subdomains-passive.txt" 2>/dev/null || echo "0")
