@@ -983,14 +983,25 @@ main_vulns() {
         log_warning "Some steps failed: ${failed_steps[*]}"
     fi
     
-    # Final notification
-    local critical_count=$(grep -c "\[critical\]" "${base_dir}/vulnerabilities.txt" 2>/dev/null || echo "0")
-    local high_count=$(grep -c "\[high\]" "${base_dir}/vulnerabilities.txt" 2>/dev/null || echo "0")
+    # Final notification  
+    local critical_count="0"
+    local high_count="0"
+    
+    if [[ -f "${base_dir}/vulnerabilities.txt" && -s "${base_dir}/vulnerabilities.txt" ]]; then
+        critical_count=$(grep -c "\[critical\]" "${base_dir}/vulnerabilities.txt" 2>/dev/null || echo "0")
+        high_count=$(grep -c "\[high\]" "${base_dir}/vulnerabilities.txt" 2>/dev/null || echo "0")
+    fi
+    
+    # Ensure values are numeric
+    critical_count="${critical_count//[^0-9]/}"
+    high_count="${high_count//[^0-9]/}"
+    critical_count="${critical_count:-0}"
+    high_count="${high_count:-0}"
     
     notify_module_complete "$DOMAIN" "Vulnerability Scan" "$total_vulns findings ($critical_count critical, $high_count high)"
     
     # Send special alert for critical vulnerabilities
-    if [[ $critical_count -gt 0 ]]; then
+    if [[ "$critical_count" -gt 0 ]]; then
         notify_vulnerability_found "$DOMAIN" "Critical" "$critical_count"
     fi
     
