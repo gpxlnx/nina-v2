@@ -143,8 +143,7 @@ export GF_PATTERNS="${DIR_NINA_TEMPLATES}/gf"
 # NOTIFICATION AND INTEGRATION SETTINGS
 # =============================================================================
 
-# Notification settings
-export NOTIFY_CONFIG="${DIR_NINA_CREDS}/provider-config-notify.yaml"
+# Legacy notification settings (keeping for compatibility)
 export SLACK_WEBHOOK="${SLACK_WEBHOOK:-}"
 export DISCORD_WEBHOOK="${DISCORD_WEBHOOK:-}"
 

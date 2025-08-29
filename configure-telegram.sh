@@ -58,7 +58,7 @@ main() {
     fi
     
     echo
-    log_step "2. Criando configuração do Telegram..."
+    log_step "2. Configurando Telegram no arquivo existente..."
     
     # Criar diretório de configuração
     local config_dir="$HOME/.config/notify"
@@ -66,8 +66,39 @@ main() {
     
     mkdir -p "$config_dir"
     
-    # Criar arquivo de configuração
-    cat > "$config_file" << EOF
+    # Verificar se arquivo já existe
+    if [[ -f "$config_file" ]]; then
+        log_warning "Arquivo de configuração já existe: $config_file"
+        
+        # Verificar se nossa configuração já existe
+        if grep -q "nina-result" "$config_file" 2>/dev/null; then
+            log_warning "Configuração 'nina-result' já existe. Removendo versão antiga..."
+            # Criar backup
+            cp "$config_file" "${config_file}.backup.$(date +%s)"
+            
+            # Remover configuração existente do nina-result
+            sed -i '/# NINA-v2 Telegram Configuration/,/telegram_parsemode: "Markdown"/d' "$config_file" 2>/dev/null || true
+            sed -i '/id: "nina-result"/,/telegram_parsemode: "Markdown"/d' "$config_file" 2>/dev/null || true
+        fi
+        
+        log_info "Adicionando configuração NINA-v2 ao arquivo existente..."
+        
+        # Adicionar nossa configuração ao arquivo existente
+        cat >> "$config_file" << EOF
+
+# NINA-v2 Telegram Configuration
+# Auto-generated on $(date)
+  - id: "nina-result"
+    telegram_api_key: "$TELEGRAM_BOT_TOKEN"
+    telegram_chat_id: "$TELEGRAM_CHAT_ID"
+    telegram_format: "{{data}}"
+    telegram_parsemode: "Markdown"
+EOF
+    else
+        log_info "Criando novo arquivo de configuração..."
+        
+        # Criar novo arquivo de configuração
+        cat > "$config_file" << EOF
 # NINA-v2 Telegram Configuration
 # Auto-generated on $(date)
 
@@ -78,8 +109,9 @@ providers:
     telegram_format: "{{data}}"
     telegram_parsemode: "Markdown"
 EOF
+    fi
     
-    log_info "✅ Configuração criada em: $config_file"
+    log_info "✅ Configuração NINA-v2 adicionada em: $config_file"
     
     echo
     log_step "3. Configurando variáveis de ambiente..."
