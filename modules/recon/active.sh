@@ -128,12 +128,8 @@ dns_bruteforce_puredns() {
     local wordlist_size=$(wc -l < "$wordlist")
     log_info "Starting PureDNS with $wordlist_size subdomains"
     
-    # Adjust wordlist size based on scope and limits
-    if [[ $wordlist_size -gt $SUBDOMAIN_BRUTEFORCE_LIMIT ]]; then
-        log_info "Limiting wordlist to $SUBDOMAIN_BRUTEFORCE_LIMIT entries"
-        head -n "$SUBDOMAIN_BRUTEFORCE_LIMIT" "$wordlist" > "${wordlist}.limited"
-        wordlist="${wordlist}.limited"
-    fi
+    # Use full wordlist without limits
+    log_info "Using full wordlist with $wordlist_size entries (no limit applied)"
     
     # Run PureDNS with appropriate settings
     local puredns_args=()
@@ -162,8 +158,7 @@ dns_bruteforce_puredns() {
         touch "${base_dir}/recon/puredns-results.txt"
     fi
     
-    # Cleanup
-    rm -f "${wordlist}.limited" 2>/dev/null
+    # No cleanup needed - using original wordlist
     
     commit_step "PureDNS Bruteforce"
     return 0
@@ -191,20 +186,14 @@ dns_bruteforce_shuffledns() {
         return 0
     fi
     
-    # Limit wordlist size
-    local limited_wordlist="${wordlist}"
+    # Use full wordlist without limits
     local wordlist_size=$(wc -l < "$wordlist")
-    if [[ $wordlist_size -gt $SUBDOMAIN_BRUTEFORCE_LIMIT ]]; then
-        limited_wordlist="${wordlist}.shuffledns-limited"
-        head -n "$SUBDOMAIN_BRUTEFORCE_LIMIT" "$wordlist" > "$limited_wordlist"
-    fi
-    
-    log_info "Running ShuffleDNS with $(wc -l < "$limited_wordlist") subdomains"
+    log_info "Running ShuffleDNS with $wordlist_size subdomains (no limit applied)"
     
     # Run ShuffleDNS
     timeout 1800 shuffledns -silent -d "$DOMAIN" \
     -r "${DNS_RESOLVERS}" \
-    -w "$limited_wordlist" \
+    -w "$wordlist" \
     -mode bruteforce \
     -o "${bruteforce_dir}/shuffledns-raw.txt" 2>/dev/null || true
     
@@ -222,8 +211,7 @@ dns_bruteforce_shuffledns() {
         touch "${base_dir}/recon/shuffledns-results.txt"
     fi
     
-    # Cleanup
-    rm -f "${limited_wordlist}" 2>/dev/null
+    # No cleanup needed - using original wordlist
     
     commit_step "ShuffleDNS Bruteforce"
     return 0
@@ -588,135 +576,23 @@ EOF
 prepare_bruteforce_wordlist() {
     local output_wordlist="$1"
     
-    # Combine multiple wordlist sources
-    local wordlist_sources=(
-        "$WORDLIST_SUBDOMAINS"
-        "${DIR_NINA_LISTS}/wordlist-gpxlnx-subs.txt"
-    )
+    # Use only the specified wordlist source
+    local wordlist_source="${DIR_NINA_LISTS}/wordlist-gpxlnx-subs.txt"
     
-    # Start with base wordlists
-    cat "${wordlist_sources[@]}" 2>/dev/null | \
+    # Check if wordlist exists
+    if [[ ! -f "$wordlist_source" ]]; then
+        log_error "Wordlist not found: $wordlist_source"
+        return 1
+    fi
+    
+    # Start with base wordlist (no limit)
+    cat "$wordlist_source" 2>/dev/null | \
     grep -v '^$' | \
     sort -u > "$output_wordlist.tmp"
     
-    # Add common subdomains if wordlist is small
-    local current_size=$(wc -l < "$output_wordlist.tmp" 2>/dev/null || echo "0")
-    if [[ $current_size -lt 1000 ]]; then
-        cat >> "$output_wordlist.tmp" << 'EOF'
-www
-api
-admin
-mail
-ftp
-test
-dev
-staging
-app
-mobile
-blog
-shop
-store
-portal
-dashboard
-panel
-secure
-vpn
-cdn
-img
-images
-static
-assets
-files
-download
-upload
-media
-video
-support
-help
-docs
-wiki
-forum
-community
-chat
-news
-beta
-alpha
-demo
-sandbox
-qa
-uat
-prod
-production
-development
-www1
-www2
-mail1
-mail2
-ns1
-ns2
-dns1
-dns2
-mx1
-mx2
-smtp
-pop
-imap
-webmail
-autodiscover
-remote
-citrix
-owa
-exchange
-sharepoint
-intranet
-extranet
-partner
-vendor
-client
-customer
-guest
-public
-private
-internal
-external
-backup
-archive
-old
-new
-legacy
-v1
-v2
-v3
-mobile
-m
-wap
-edge
-wireless
-wifi
-voip
-sip
-rtp
-streaming
-live
-stream
-rtmp
-hls
-dash
-EOF
-    fi
-    
-    # Generate patterns based on existing subdomains
-    if [[ -f "${DIR_OUTPUT}/${DOMAIN}/recon/subdomains-passive.txt" ]]; then
-        cat "${DIR_OUTPUT}/${DOMAIN}/recon/subdomains-passive.txt" | \
-        sed "s/\.${DOMAIN}$//" | \
-        grep -v "^${DOMAIN}$" | \
-        head -100 >> "$output_wordlist.tmp" || true
-    fi
-    
-    # Final processing
+    # Final processing - no limit applied
     sort -u "$output_wordlist.tmp" | \
-    grep -E '^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$' | \
-    head -"$SUBDOMAIN_BRUTEFORCE_LIMIT" > "$output_wordlist"
+    grep -E '^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$' > "$output_wordlist"
     
     rm -f "$output_wordlist.tmp"
     

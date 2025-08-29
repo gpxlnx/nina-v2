@@ -257,8 +257,14 @@ send_notification() {
         *) emoji="📢" ;;
     esac
     
-    # Format message for Telegram
-    local formatted_message="${emoji} **NINA Recon**\n\n${message}"
+    # Format message for Telegram (don't add extra prefixes for complete messages)
+    if [[ "$priority" == "complete" ]]; then
+        local formatted_message="${message}"
+    else
+        local formatted_message="${emoji} **NINA Recon**
+
+${message}"
+    fi
     
     # Debug logging
     if [[ "${DEBUG_NOTIFY:-false}" == "true" ]]; then
@@ -312,7 +318,16 @@ notify_scan_complete() {
     local domain="$1"
     local stats="$2"
     local duration="$3"
-    send_notification "🎯 **Scan Complete**\n\nTarget: \`${domain}\`\nDuration: \`${duration}\`\n\n${stats}" "complete"
+    
+    # Format complete message as single block
+    local complete_message="🎯 **Scan Complete**
+
+Target: \`${domain}\`
+Duration: \`${duration}\`
+
+${stats}"
+    
+    send_notification "$complete_message" "complete"
 }
 
 notify_error() {

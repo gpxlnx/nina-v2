@@ -689,13 +689,13 @@ send_completion_notification() {
         [[ -f "$results_dir/vulnerabilities.txt" ]] && \
             vulnerabilities=$(wc -l < "$results_dir/vulnerabilities.txt")
         
-        # Format stats message
-        local stats="**📊 Results:**\n"
-        stats+="• Passive Subdomains: \`${passive_subs}\`\n"
-        stats+="• Active Subdomains: \`${active_subs}\`\n"
-        stats+="• Live Hosts: \`${live_hosts}\`\n"
-        stats+="• Total URLs: \`${urls}\`\n"
-        stats+="• Vulnerabilities: \`${vulnerabilities}\`"
+        # Format stats message as single block
+        local stats="**📊 Results:**
+• Passive Subdomains: \`${passive_subs}\`
+• Active Subdomains: \`${active_subs}\`
+• Live Hosts: \`${live_hosts}\`
+• Total URLs: \`${urls}\`
+• Vulnerabilities: \`${vulnerabilities}\`"
         
         # Send completion notification
         notify_scan_complete "$TARGET_DOMAIN" "$stats" "$duration"
