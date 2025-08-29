@@ -230,7 +230,18 @@ send_notification() {
     local message="$1"
     local priority="${2:-info}"  # info, success, warning, error
     
+    # Debug logging
+    if [[ "${DEBUG_NOTIFY:-false}" == "true" ]]; then
+        log_info "DEBUG: send_notification called with message: $message"
+        log_info "DEBUG: NOTIFY_ENABLED=$NOTIFY_ENABLED"
+        log_info "DEBUG: NOTIFY_CONFIG=$NOTIFY_CONFIG"
+        log_info "DEBUG: NOTIFY_PROVIDER_ID=$NOTIFY_PROVIDER_ID"
+    fi
+    
     if ! check_notify_setup; then
+        if [[ "${DEBUG_NOTIFY:-false}" == "true" ]]; then
+            log_warning "DEBUG: check_notify_setup failed"
+        fi
         return 0
     fi
     
@@ -250,10 +261,24 @@ send_notification() {
     # Format message for Telegram
     local formatted_message="${emoji} **NINA Recon**\n\n${message}"
     
+    # Debug logging
+    if [[ "${DEBUG_NOTIFY:-false}" == "true" ]]; then
+        log_info "DEBUG: Sending notification with command:"
+        log_info "DEBUG: echo -e \"$formatted_message\" | notify -provider-config \"$NOTIFY_CONFIG\" -id \"$NOTIFY_PROVIDER_ID\""
+    fi
+    
     # Send notification
-    echo -e "$formatted_message" | notify -provider-config "$NOTIFY_CONFIG" -id "$NOTIFY_PROVIDER_ID" 2>/dev/null || {
-        log_warning "Failed to send notification"
-    }
+    local notify_result=0
+    echo -e "$formatted_message" | notify -provider-config "$NOTIFY_CONFIG" -id "$NOTIFY_PROVIDER_ID" 2>&1 || notify_result=$?
+    
+    if [[ $notify_result -ne 0 ]]; then
+        log_warning "Failed to send notification (exit code: $notify_result)"
+        if [[ "${DEBUG_NOTIFY:-false}" == "true" ]]; then
+            log_warning "DEBUG: Check if notify tool is working: echo 'test' | notify -id $NOTIFY_PROVIDER_ID"
+        fi
+    elif [[ "${DEBUG_NOTIFY:-false}" == "true" ]]; then
+        log_info "DEBUG: Notification sent successfully"
+    fi
 }
 
 # Notification shortcuts for different types
